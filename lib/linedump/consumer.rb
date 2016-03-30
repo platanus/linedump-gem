@@ -17,7 +17,7 @@ module Linedump
 
     def register_stream(_stream, &_block)
       # TODO: locking for non-GIL platforms
-      @streams << StreamWrapper.new(_stream, _block)
+      streams << StreamWrapper.new(_stream, _block)
     end
 
     def is_registered?(_stream)
@@ -44,18 +44,18 @@ module Linedump
 
   private
 
+    attr_reader :streams
+
     def load_worker
       Thread.new do
-        looped = 0
         begin
-          while @streams.count > 0
+          while ensure_open_streams
             read_streams = load_monitored_streams
             result = IO.select(read_streams, [], read_streams)
             if result
               process_ready_streams result[0]
               discard_errored_streams result[2]
             end
-            looped += 1
           end
         rescue ReloadSignal
           retry
@@ -83,17 +83,23 @@ module Linedump
     end
 
     def find_stream_wrapper(_stream)
-      @streams.find { |s| s.stream == _stream }
+      streams.find { |s| s.stream == _stream }
     end
 
     def remove_wrapper(_wrapper, _reason)
       # TODO: locking for non-GIL platforms
-      @streams.delete _wrapper
+      _wrapper.stream.close
+      streams.delete _wrapper
+    end
+
+    def ensure_open_streams
+      streams.delete_if { |w| w.stream.closed? }
+      !streams.empty?
     end
 
     def load_monitored_streams
       # include stdin to prevent console enabled apps from locking
-      @streams.map(&:stream) << $stdin
+      streams.map(&:stream) << $stdin
     end
 
   end

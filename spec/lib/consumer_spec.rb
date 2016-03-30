@@ -1,5 +1,4 @@
 describe Linedump::Consumer do
-
   with_fake_process(:proc_a, 'hello')
   with_fake_process(:proc_b, 'world')
 
@@ -15,7 +14,6 @@ describe Linedump::Consumer do
   end
 
   describe 'register_stream' do
-
     it "should begin consuming stream and passing it to given block" do
       output = []
       consumer.register_stream(proc_a_stdout) { |l| output << l }
@@ -39,6 +37,16 @@ describe Linedump::Consumer do
       expect(consumer.is_registered? proc_a_stdout).to be false
     end
 
-  end
+    it "should automatically remove watched stream if stream is closed" do
+      consumer.register_stream(proc_a_stdout) { |l| }
+      consumer.reload
+      sleep 1.0
 
+      expect(consumer.is_registered? proc_a_stdout).to be true
+      proc_a_stdout.close
+      consumer.reload
+      sleep 1.0
+      expect(consumer.is_registered? proc_a_stdout).to be false
+    end
+  end
 end
